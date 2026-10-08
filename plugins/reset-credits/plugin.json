@@ -1,0 +1,236 @@
+{
+  "manifestVersion": 2,
+  "name": "reset-credits",
+  "displayName": "额度重置卡",
+  "publisher": "wanghuxiong",
+  "version": "0.2.0",
+  "description": "批量或按额度阈值自动使用 OpenAI OAuth 账号的主动额度重置卡",
+  "license": "Apache-2.0",
+  "author": "王胡雄",
+  "engines": {
+    "codex-proxy-rs": ">=3.21.0, <4.0.0"
+  },
+  "main": "bin/plugin",
+  "runtime": "trustedProcess",
+  "contributes": {
+    "management": {},
+    "maintenance": {}
+  },
+  "configurationSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "resources": {
+    "web/index.html": "text/html",
+    "web/app.js": "text/javascript",
+    "web/app.css": "text/css"
+  },
+  "state": [
+    {
+      "namespace": "accounts",
+      "schemaVersion": 1,
+      "schema": {
+        "type": "object",
+        "required": [
+          "pending",
+          "last"
+        ],
+        "properties": {
+          "pending": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "redeemRequestId",
+              "creditId",
+              "startedAtMs"
+            ],
+            "properties": {
+              "redeemRequestId": {
+                "type": "string",
+                "minLength": 36,
+                "maxLength": 36
+              },
+              "creditId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "startedAtMs": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "last": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "outcome",
+              "code",
+              "atMs"
+            ],
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "reset",
+                  "no_credit",
+                  "not_executed",
+                  "failed",
+                  "discarded"
+                ]
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 64
+              },
+              "atMs": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "maximumRecords": 5000,
+      "maximumBytes": 4194304,
+      "maximumValueBytes": 2048,
+      "migratesFrom": []
+    },
+    {
+      "namespace": "automation",
+      "schemaVersion": 1,
+      "schema": {
+        "type": "object",
+        "required": [
+          "cycleResetAtMs",
+          "last",
+          "retryAtMs"
+        ],
+        "properties": {
+          "cycleResetAtMs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "last": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "outcome",
+              "code",
+              "trigger",
+              "atMs"
+            ],
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "resetting",
+                  "reset",
+                  "no_credit",
+                  "not_executed",
+                  "failed",
+                  "unknown",
+                  "cycle_used"
+                ]
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 64
+              },
+              "trigger": {
+                "enum": [
+                  "weekly",
+                  "short_term",
+                  "both",
+                  null
+                ]
+              },
+              "atMs": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "retryAtMs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "maximumRecords": 5000,
+      "maximumBytes": 4194304,
+      "maximumValueBytes": 1024,
+      "migratesFrom": []
+    },
+    {
+      "namespace": "settings",
+      "schemaVersion": 1,
+      "schema": {
+        "type": "object",
+        "required": [
+          "accounts"
+        ],
+        "properties": {
+          "accounts": {
+            "type": "object",
+            "maxProperties": 3000,
+            "additionalProperties": {
+              "type": "object",
+              "required": [
+                "weeklyThreshold",
+                "shortTermThreshold"
+              ],
+              "properties": {
+                "weeklyThreshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "shortTermThreshold": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "maximum": 100
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "maximumRecords": 1,
+      "maximumBytes": 262144,
+      "maximumValueBytes": 262144,
+      "migratesFrom": []
+    }
+  ]
+}

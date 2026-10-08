@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# 构建额度重置卡插件的 Linux 安装包；页面在本机构建，Rust 二进制与打包 CLI 在 Docker 中构建
+# Windows 使用 Git Bash 与 Docker Desktop，产物写入仓库根目录的 dist/
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+plugin_target="${1:-x86_64-unknown-linux-gnu}"
+case "$plugin_target" in
+  x86_64-unknown-linux-gnu) docker_platform=linux/amd64 ;;
+  aarch64-unknown-linux-gnu) docker_platform=linux/arm64 ;;
+  *) echo "不支持的插件目标平台：$plugin_target" >&2; exit 1 ;;
+esac
+# 打包 CLI 与 backend/Cargo.toml 中的 SDK 固定到同一宿主提交
+host_rev=cb397ae53eb625f9165bbb6fce1e19e88ac86dc4
+arch="${docker_platform#linux/}"
+
+pnpm_command=(pnpm)
+if ! command -v pnpm >/dev/null 2>&1; then
+  pnpm_command=(corepack pnpm)
+fi
+(cd frontend && "${pnpm_command[@]}" install --frozen-lockfile && "${pnpm_command[@]}" build)
+
+repository_root="$(cd ../.. && pwd)"
+if command -v cygpath >/dev/null 2>&1; then
+  repository_root="$(cygpath -m "$repository_root")"
+fi
+
+MSYS_NO_PATHCONV=1 docker run --rm --platform "$docker_platform" \
+  -v "$repository_root:/work" \
+  -v cpr-plugin-cargo-registry:/usr/local/cargo/registry \
+  -v cpr-plugin-cargo-git:/usr/local/cargo/git \
+  -v "cpr-plugin-rustup-$arch:/usr/local/rustup" \
+  -v "cpr-plugin-tools-$arch:/tools" \
+  -v "cpr-reset-credits-target-$arch:/target" \
+  -e CARGO_TARGET_DIR=/target \
+  -w /work/plugins/reset-credits \
+  rust:1.97-bookworm \
+  bash -euo pipefail -c "
+    cli=/tools/$host_rev/bin/cpr-plugin
+    if [ ! -x \"\$cli\" ]; then
+      cargo install --locked --git https://github.com/zyycn/codex-proxy-rs.git --rev $host_rev codex-proxy-plugin-cli --root /tools/$host_rev
+    fi
+    cargo build --release --locked --target $plugin_target --manifest-path backend/Cargo.toml
+    \"\$cli\" package \
+      --manifest plugin.json \
+      --binary /target/$plugin_target/release/codex-proxy-plugin-reset-credits \
+      --target $plugin_target \
+      --resource-map web=frontend/dist \
+      --output-dir /work/dist
+  "
